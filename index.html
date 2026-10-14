@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="免費線上課堂倒數計時器：快速預設 30 秒到 45 分鐘、自訂分秒、圓環進度、結束提示音、全螢幕投影模式，適合上課、考試、簡報與活動計時。">
+<meta name="keywords" content="倒數計時器, 線上計時器, 課堂計時器, 考試計時, countdown timer">
+<meta property="og:title" content="課堂倒數計時器">
+<meta property="og:description" content="免費線上倒數計時器，支援全螢幕投影與結束提示音。">
+<meta property="og:type" content="website">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>課堂倒數計時器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one centered dial, a pixel runner track below it, presets and controls stacked below */
+:root{
+  --bg:#eef1ef; --surface:#ffffff; --ink:#18231f; --muted:#5f6e68; --line:#d3dbd7;
+  --accent:#d9480f; --track:#dde4e0; --warn:#c2255c;
+  --font-digit:"Chivo Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-ui:"Noto Sans TC", system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121816; --surface:#1b2320; --ink:#e7ede9; --muted:#93a39c; --line:#2c3833;
+  --accent:#ff7a3d; --track:#26302c; --warn:#f06595; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121816; --surface:#1b2320; --ink:#e7ede9; --muted:#93a39c; --line:#2c3833;
+  --accent:#ff7a3d; --track:#26302c; --warn:#f06595; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:24px 40px;display:flex;flex-direction:column;align-items:center;gap:22px}
+header{width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.02em}
+.label{font-size:.75rem;color:var(--muted);letter-spacing:.08em}
+
+.dial{position:relative;width:min(84vw,380px);aspect-ratio:1;max-width:100%}
+.dial svg{width:100%;height:100%;transform:rotate(-90deg)}
+.dial circle{fill:none}
+.track{stroke:var(--track)}
+.prog{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .3s}
+.ticks line{stroke:var(--line)}
+.ticks line.major{stroke:var(--muted)}
+.readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.time{font-family:var(--font-digit);font-weight:300;font-size:clamp(3rem,15vw,5.2rem);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.status{font-size:.85rem;color:var(--muted);letter-spacing:.1em}
+.dial.done .time{color:var(--warn);animation:blink 1s steps(2) infinite}
+.dial.done .prog{stroke:var(--warn)}
+.dial.low .prog{stroke:var(--warn)}
+@keyframes blink{50%{opacity:.25}}
+
+/* Runner track */
+.race{--p:0;position:relative;width:min(84vw,380px);max-width:100%;height:72px;margin-top:-6px}
+.lane{position:absolute;left:0;right:0;bottom:10px;height:3px;border-radius:2px;
+  background:repeating-linear-gradient(90deg,var(--line) 0 10px,transparent 10px 18px)}
+.lane-done{position:absolute;left:0;bottom:10px;height:3px;border-radius:2px;background:var(--accent);
+  width:calc((100% - 58px) * var(--p) + 24px);opacity:.55}
+.finish{position:absolute;right:0;bottom:10px;width:10px;height:46px;border-radius:2px;
+  background:repeating-conic-gradient(var(--ink) 0 25%,var(--surface) 0 50%) 0 0/10px 10px;border:1px solid var(--ink)}
+#runner{position:absolute;bottom:13px;left:calc((100% - 58px) * var(--p));width:48px;height:52px;
+  image-rendering:pixelated;image-rendering:crisp-edges}
+.race.running #runner{animation:bob .22s steps(2) infinite}
+.race.done #runner{animation:hop .5s ease-in-out infinite}
+.race.low .lane-done{background:var(--warn)}
+@keyframes bob{50%{transform:translateY(-2px)}}
+@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+
+.presets{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.chip{font:500 .9rem var(--font-ui);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.custom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.field{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.field input{width:3.2em;border:0;background:transparent;color:var(--ink);font:500 1.2rem var(--font-digit);text-align:right;font-variant-numeric:tabular-nums}
+.field input:focus{outline:none}
+.field:focus-within{border-color:var(--accent)}
+.field span{color:var(--muted);font-size:.85rem}
+
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.btn{font:700 1rem var(--font-ui);padding:12px 22px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-width:6.5em}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:hover:not(:disabled){filter:brightness(1.05)}
+:is(.btn,.chip,input,label):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.opts{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:.85rem}
+.opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.hint{font-size:.78rem;color:var(--muted);text-align:center}
+
+/* Appearance settings */
+.settings{display:flex;gap:16px 22px;flex-wrap:wrap;justify-content:center;align-items:center;color:var(--muted);font-size:.85rem}
+.setting{display:flex;align-items:center;gap:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:2px}
+.seg button{font:500 .82rem var(--font-ui);border:0;background:transparent;color:var(--muted);padding:5px 11px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.swatches{display:flex;gap:6px;align-items:center}
+.swatch{width:24px;height:24px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);background:var(--c);cursor:pointer;padding:0}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+.swatch.custom{position:relative;overflow:hidden;background:conic-gradient(#e03131,#f08c00,#2f9e44,#1971c2,#7048e8,#e03131)}
+.swatch.custom input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:0;padding:0}
+.seg button:focus-visible,.swatch:focus-visible,.swatch.custom:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+kbd{font-family:var(--font-digit);font-size:.75rem;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+
+body.fs .presets,body.fs .custom,body.fs .opts,body.fs .settings,body.fs .hint,body.fs header{display:none}
+body.fs .dial{width:min(90vw,66vh)}
+body.fs .race{width:min(90vw,110vh);height:96px}
+body.fs #runner{width:72px;height:78px;left:calc((100% - 82px) * var(--p))}
+body.fs .lane-done{width:calc((100% - 82px) * var(--p) + 36px)}
+body.fs .finish{height:70px}
+@media (prefers-reduced-motion:reduce){.prog{transition:none}.dial.done .time{animation:none}.race #runner{animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>課堂倒數計時器</h1>
+    <span class="label" id="endAt">—</span>
+  </header>
+
+  <div class="dial" id="dial">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <g class="ticks" id="ticks"></g>
+      <circle class="track" cx="100" cy="100" r="84" stroke-width="10"/>
+      <circle class="prog" id="prog" cx="100" cy="100" r="84" stroke-width="10"/>
+    </svg>
+    <div class="readout">
+      <div class="time" id="time" role="timer" aria-live="off">05:00</div>
+      <div class="status" id="status">準備開始</div>
+    </div>
+  </div>
+
+  <div class="race" id="race" aria-hidden="true">
+    <div class="lane"></div>
+    <div class="lane-done"></div>
+    <div class="finish"></div>
+    <canvas id="runner" width="12" height="13"></canvas>
+  </div>
+
+  <div class="presets" id="presets" role="group" aria-label="快速設定">
+    <button class="chip" data-s="30">30 秒</button>
+    <button class="chip" data-s="60">1 分</button>
+    <button class="chip" data-s="180">3 分</button>
+    <button class="chip" data-s="300" aria-pressed="true">5 分</button>
+    <button class="chip" data-s="600">10 分</button>
+    <button class="chip" data-s="900">15 分</button>
+    <button class="chip" data-s="2700">45 分</button>
+  </div>
+
+  <form class="custom" id="customForm">
+    <label class="field" for="inMin"><input id="inMin" type="number" min="0" max="599" value="5" inputmode="numeric"><span>分</span></label>
+    <label class="field" for="inSec"><input id="inSec" type="number" min="0" max="59" value="0" inputmode="numeric"><span>秒</span></label>
+    <button class="chip" type="submit">設定</button>
+  </form>
+
+  <div class="controls">
+    <button class="btn primary" id="startBtn">開始</button>
+    <button class="btn" id="addBtn">+1 分</button>
+    <button class="btn" id="resetBtn">重設</button>
+    <button class="btn" id="fsBtn">全螢幕</button>
+  </div>
+
+  <div class="opts">
+    <label for="optSound"><input type="checkbox" id="optSound" checked> 結束提示音</label>
+    <label for="optTick"><input type="checkbox" id="optTick"> 最後 10 秒嗶聲</label>
+  </div>
+
+  <div class="settings">
+    <div class="setting">
+      <span id="themeLbl">外觀</span>
+      <div class="seg" id="themeSeg" role="group" aria-labelledby="themeLbl">
+        <button type="button" data-theme="auto">自動</button>
+        <button type="button" data-theme="light">淺色</button>
+        <button type="button" data-theme="dark">深色</button>
+      </div>
+    </div>
+    <div class="setting">
+      <span id="accentLbl">主題色</span>
+      <div class="swatches" id="swatches" role="group" aria-labelledby="accentLbl">
+        <button type="button" class="swatch" data-accent="orange" style="--c:#e8590c" aria-label="橘色"></button>
+        <button type="button" class="swatch" data-accent="blue" style="--c:#1c7ed6" aria-label="藍色"></button>
+        <button type="button" class="swatch" data-accent="green" style="--c:#2b8a3e" aria-label="綠色"></button>
+        <button type="button" class="swatch" data-accent="purple" style="--c:#7048e8" aria-label="紫色"></button>
+        <label class="swatch custom" data-accent="custom" title="自訂顏色"><input type="color" id="customColor" value="#0ca678" aria-label="自訂顏色"></label>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint"><kbd>空白鍵</kbd> 開始／暫停　<kbd>R</kbd> 重設　<kbd>F</kbd> 全螢幕　<kbd>↑</kbd><kbd>↓</kbd> ±1 分</p>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const R = 84, C = 2 * Math.PI * R;
+  const prog = $('prog'), dial = $('dial'), timeEl = $('time'), statusEl = $('status');
+  const race = $('race'), runner = $('runner'), rctx = runner.getContext('2d');
+  prog.style.strokeDasharray = C;
+
+  // 60 tick marks around the dial
+  const ticks = $('ticks');
+  for (let i = 0; i < 60; i++) {
+    const a = i / 60 * 2 * Math.PI, major = i % 5 === 0;
+    const r1 = major ? 93 : 95, r2 = 98;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 100 + r1 * Math.cos(a)); l.setAttribute('y1', 100 + r1 * Math.sin(a));
+    l.setAttribute('x2', 100 + r2 * Math.cos(a)); l.setAttribute('y2', 100 + r2 * Math.sin(a));
+    l.setAttribute('stroke-width', major ? 1.4 : .7);
+    if (major) l.classList.add('major');
+    ticks.appendChild(l);
+  }
+
+  // ---- Pixel runner (original character: a little round bean) ----
+  // o = outline, b = body, w = eye white, k = pupil
+  const BODY = [
+    "....oooo....",
+    "..oobbbboo..",
+    ".obbbbbbbbo.",
+    ".obbbbbwwko.",
+    "obbbbbbwwkbo",
+    "obbbbbbbbbbo",
+    "oobbbbbbbbbo",
+    "obbbbbbbbboo",
+    ".obbbbbbbbo.",
+    "..oobbbboo..",
+  ];
+  const LEGS = [
+    ["...o....o...", "..o......o..", ".oo......oo."], // stride
+    [".....oo.....", ".....oo.....", "....ooo....."], // passing
+    ["....o..o....", "...o....o...", "..oo...oo..."], // stride (other leg)
+    ["....o..o....", "....o..o....", "...oo..oo..."], // standing
+  ];
+  const RUN_SEQ = [0, 1, 2, 1];
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let lastFrame = -1;
+
+  function drawRunner(f, force = false) {
+    if (f === lastFrame && !force) return;
+    lastFrame = f;
+    const cs = getComputedStyle(document.documentElement);
+    const pal = { o: cs.getPropertyValue('--ink').trim(), b: cs.getPropertyValue('--accent').trim(), w: '#ffffff', k: '#111111' };
+    rctx.clearRect(0, 0, runner.width, runner.height);
+    BODY.concat(LEGS[f]).forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const c = pal[row[x]];
+        if (c) { rctx.fillStyle = c; rctx.fillRect(x, y, 1, 1); }
+      }
+    });
+  }
+  const runFrame = () => reduceMotion.matches ? 3 : RUN_SEQ[Math.floor(performance.now() / 110) % RUN_SEQ.length];
+  // ---- Appearance: theme (auto / light / dark) + accent color, remembered per browser ----
+  const ACCENTS = {
+    orange: { l: '#d9480f', d: '#ff7a3d' },
+    blue:   { l: '#1c7ed6', d: '#4dabf7' },
+    green:  { l: '#2b8a3e', d: '#51cf66' },
+    purple: { l: '#7048e8', d: '#9775fa' },
+  };
+  const darkMq = matchMedia('(prefers-color-scheme: dark)');
+  const load = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  let theme = load('timer-theme', 'auto'), accent = load('timer-accent', 'orange'), custom = load('timer-custom', '#0ca678');
+  if (!['auto', 'light', 'dark'].includes(theme)) theme = 'auto';
+  if (accent !== 'custom' && !ACCENTS[accent]) accent = 'orange';
+  if (!/^#[0-9a-f]{6}$/i.test(custom)) custom = '#0ca678';
+  $('customColor').value = custom;
+
+  function applyAppearance() {
+    const root = document.documentElement;
+    if (theme === 'auto') delete root.dataset.theme; else root.dataset.theme = theme;
+    const dark = theme === 'dark' || (theme === 'auto' && darkMq.matches);
+    root.style.setProperty('--accent', accent === 'custom' ? custom : ACCENTS[accent][dark ? 'd' : 'l']);
+    document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === theme));
+    document.querySelectorAll('#swatches .swatch').forEach(s => s.setAttribute('aria-pressed', s.dataset.accent === accent));
+    drawRunner(lastFrame < 0 ? 3 : lastFrame, true);
+  }
+  $('themeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    theme = b.dataset.theme; save('timer-theme', theme); applyAppearance();
+  });
+  $('swatches').addEventListener('click', e => {
+    const s = e.target.closest('button.swatch'); if (!s) return;
+    accent = s.dataset.accent; save('timer-accent', accent); applyAppearance();
+  });
+  $('customColor').addEventListener('input', e => {
+    custom = e.target.value; accent = 'custom';
+    save('timer-custom', custom); save('timer-accent', accent); applyAppearance();
+  });
+  darkMq.addEventListener('change', applyAppearance);
+  applyAppearance();
+
+  let total = 300, remainMs = 300000, endTime = 0, running = false, raf = 0, lastBeep = -1, wakeLock = null;
+
+  const fmt = ms => {
+    const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+    const p = n => String(n).padStart(2, '0');
+    return h ? `${h}:${p(m)}:${p(ss)}` : `${p(m)}:${p(ss)}`;
+  };
+
+  function render() {
+    timeEl.textContent = fmt(remainMs);
+    const frac = total ? remainMs / (total * 1000) : 0;
+    prog.style.strokeDashoffset = C * (1 - frac);
+    const low = running && remainMs <= 10000 && remainMs > 0;
+    dial.classList.toggle('low', low);
+    race.style.setProperty('--p', Math.min(1, Math.max(0, 1 - frac)));
+    race.classList.toggle('running', running);
+    race.classList.toggle('low', low);
+    drawRunner(running ? runFrame() : 3);
+    document.title = running ? `${fmt(remainMs)} · 倒數中` : '課堂倒數計時器';
+  }
+
+  function setTotal(sec) {
+    stop(false);
+    total = Math.max(1, Math.min(sec, 599 * 60 + 59));
+    remainMs = total * 1000;
+    dial.classList.remove('done');
+    race.classList.remove('done');
+    statusEl.textContent = '準備開始';
+    $('inMin').value = Math.floor(total / 60); $('inSec').value = total % 60;
+    document.querySelectorAll('#presets .chip').forEach(c => c.setAttribute('aria-pressed', +c.dataset.s === total));
+    $('endAt').textContent = '—';
+    $('startBtn').textContent = '開始';
+    render();
+  }
+
+  function tick() {
+    remainMs = Math.max(0, endTime - Date.now());
+    const sec = Math.ceil(remainMs / 1000);
+    if ($('optTick').checked && sec <= 10 && sec > 0 && sec !== lastBeep) { lastBeep = sec; beep(880, .08); }
+    render();
+    if (remainMs <= 0) return finish();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function start() {
+    if (remainMs <= 0) setTotal(total);
+    ensureAudio();
+    running = true; endTime = Date.now() + remainMs;
+    const end = new Date(endTime);
+    $('endAt').textContent = `預計 ${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')} 結束`;
+    statusEl.textContent = '倒數中';
+    $('startBtn').textContent = '暫停';
+    requestWake();
+    tick();
+  }
+
+  function stop(paused = true) {
+    if (running) remainMs = Math.max(0, endTime - Date.now());
+    running = false; cancelAnimationFrame(raf);
+    $('startBtn').textContent = '繼續';
+    if (paused) { statusEl.textContent = '已暫停'; $('endAt').textContent = '—'; }
+    releaseWake(); render();
+  }
+
+  function finish() {
+    running = false; remainMs = 0; render();
+    dial.classList.add('done'); dial.classList.remove('low');
+    race.classList.add('done');
+    statusEl.textContent = '時間到！';
+    $('startBtn').textContent = '再一次';
+    $('endAt').textContent = '—';
+    releaseWake();
+    if ($('optSound').checked) [0, .35, .7].forEach(t => beep(1046, .25, t));
+  }
+
+  // Audio
+  let ctx = null;
+  function ensureAudio() {
+    try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); } catch (e) {}
+  }
+  function beep(freq, dur, delay = 0) {
+    if (!ctx) return;
+    const t = ctx.currentTime + delay, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.35, t + .01); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur + .02);
+  }
+
+  // Keep screen awake while running
+  async function requestWake() { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch (e) {} }
+  function releaseWake() { try { wakeLock?.release(); } catch (e) {} wakeLock = null; }
+
+  function addTime(sec) {
+    if (dial.classList.contains('done')) { setTotal(sec > 0 ? sec : 60); return; }
+    const nextMs = Math.max(1000, remainMs + sec * 1000);
+    const delta = nextMs - remainMs;
+    remainMs = nextMs; total = Math.max(total, Math.ceil(remainMs / 1000));
+    if (running) endTime += delta;
+    render();
+  }
+
+  async function toggleFs() {
+    const on = !document.body.classList.contains('fs');
+    document.body.classList.toggle('fs', on);
+    $('fsBtn').textContent = on ? '離開全螢幕' : '全螢幕';
+    try { on ? await document.documentElement.requestFullscreen?.() : (document.fullscreenElement && await document.exitFullscreen()); } catch (e) {}
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && document.body.classList.contains('fs')) { document.body.classList.remove('fs'); $('fsBtn').textContent = '全螢幕'; }
+  });
+
+  $('presets').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) setTotal(+b.dataset.s); });
+  $('customForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const m = Math.max(0, parseInt($('inMin').value) || 0), s = Math.min(59, Math.max(0, parseInt($('inSec').value) || 0));
+    setTotal(m * 60 + s);
+  });
+  $('startBtn').onclick = () => running ? stop() : start();
+  $('resetBtn').onclick = () => setTotal(total);
+  $('addBtn').onclick = () => addTime(60);
+  $('fsBtn').onclick = toggleFs;
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); running ? stop() : start(); }
+    else if (e.key === 'r' || e.key === 'R') setTotal(total);
+    else if (e.key === 'f' || e.key === 'F') toggleFs();
+    else if (e.key === 'ArrowUp') { e.preventDefault(); addTime(60); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); addTime(-60); }
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && running) requestWake(); });
+
+  setTotal(300);
+})();
+</script>
+</body>
+</html>
