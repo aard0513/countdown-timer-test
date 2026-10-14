@@ -14,7 +14,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
-/* Layout: one centered dial, a pixel runner track below it, presets and controls stacked below */
+/* Layout
+   - Wide screens (landscape browser / projector): fills exactly one viewport, no scroll.
+     Big dial on the left, control panel on the right, runner track across the bottom.
+   - Narrow / portrait: single centered column, scrolls.
+   - Fullscreen: dial + track + a compact control row only. */
 :root{
   --bg:#eef1ef; --surface:#ffffff; --ink:#18231f; --muted:#5f6e68; --line:#d3dbd7;
   --accent:#d9480f; --track:#dde4e0; --warn:#c2255c;
@@ -30,41 +34,49 @@
 
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px}
-.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:24px 40px;display:flex;flex-direction:column;align-items:center;gap:22px}
-header{width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+
+/* ---------- Base (narrow / portrait) ---------- */
+.app{min-height:100dvh;max-width:560px;margin:0 auto;padding:24px 16px 40px;display:grid;gap:20px;
+  grid-template-columns:minmax(0,1fr);justify-items:center;
+  grid-template-areas:"head" "dial" "race" "panel"}
+header{grid-area:head;width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.02em}
 .label{font-size:.75rem;color:var(--muted);letter-spacing:.08em}
 
-.dial{position:relative;width:min(84vw,380px);aspect-ratio:1;max-width:100%}
-.dial svg{width:100%;height:100%;transform:rotate(-90deg)}
+.stage{grid-area:dial;width:100%;display:flex;align-items:center;justify-content:center}
+.dial{position:relative;width:min(84vw,380px);aspect-ratio:1;container-type:inline-size}
+.dial svg{width:100%;height:100%;transform:rotate(-90deg);display:block}
 .dial circle{fill:none}
 .track{stroke:var(--track)}
 .prog{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .3s}
 .ticks line{stroke:var(--line)}
 .ticks line.major{stroke:var(--muted)}
-.readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
-.time{font-family:var(--font-digit);font-weight:300;font-size:clamp(3rem,15vw,5.2rem);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
-.status{font-size:.85rem;color:var(--muted);letter-spacing:.1em}
+.readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.6cqw}
+.time{font-family:var(--font-digit);font-weight:300;font-size:21cqw;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.status{font-size:max(.85rem,3.6cqw);color:var(--muted);letter-spacing:.1em}
 .dial.done .time{color:var(--warn);animation:blink 1s steps(2) infinite}
 .dial.done .prog{stroke:var(--warn)}
 .dial.low .prog{stroke:var(--warn)}
 @keyframes blink{50%{opacity:.25}}
 
-/* Runner track */
-.race{--p:0;position:relative;width:min(84vw,380px);max-width:100%;height:72px;margin-top:-6px}
+/* Runner track: --rw = sprite width, everything else derives from it */
+.race{grid-area:race;--p:0;--rw:48px;position:relative;width:min(84vw,380px);height:calc(var(--rw) * 1.55)}
 .lane{position:absolute;left:0;right:0;bottom:10px;height:3px;border-radius:2px;
   background:repeating-linear-gradient(90deg,var(--line) 0 10px,transparent 10px 18px)}
-.lane-done{position:absolute;left:0;bottom:10px;height:3px;border-radius:2px;background:var(--accent);
-  width:calc((100% - 58px) * var(--p) + 24px);opacity:.55}
-.finish{position:absolute;right:0;bottom:10px;width:10px;height:46px;border-radius:2px;
+.lane-done{position:absolute;left:0;bottom:10px;height:3px;border-radius:2px;background:var(--accent);opacity:.55;
+  width:calc((100% - var(--rw) - 10px) * var(--p) + var(--rw) / 2)}
+.finish{position:absolute;right:0;bottom:10px;width:10px;height:calc(var(--rw) * 1.05);border-radius:2px;
   background:repeating-conic-gradient(var(--ink) 0 25%,var(--surface) 0 50%) 0 0/10px 10px;border:1px solid var(--ink)}
-#runner{position:absolute;bottom:13px;left:calc((100% - 58px) * var(--p));width:48px;height:52px;
+#runner{position:absolute;bottom:13px;left:calc((100% - var(--rw) - 10px) * var(--p));width:var(--rw);height:calc(var(--rw) * 13 / 12);
   image-rendering:pixelated;image-rendering:crisp-edges}
 .race.running #runner{animation:bob .22s steps(2) infinite}
 .race.done #runner{animation:hop .5s ease-in-out infinite}
 .race.low .lane-done{background:var(--warn)}
 @keyframes bob{50%{transform:translateY(-2px)}}
-@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(calc(var(--rw) * -.3))}}
+
+.panel{grid-area:panel;width:100%;display:flex;flex-direction:column;align-items:center;gap:20px}
+.section-title{display:none}
 
 .presets{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
 .chip{font:500 .9rem var(--font-ui);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
@@ -87,10 +99,8 @@ h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.02em}
 
 .opts{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:.85rem}
 .opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
-.hint{font-size:.78rem;color:var(--muted);text-align:center}
 
-/* Appearance settings */
-.settings{display:flex;gap:16px 22px;flex-wrap:wrap;justify-content:center;align-items:center;color:var(--muted);font-size:.85rem}
+.settings{display:flex;gap:14px 22px;flex-wrap:wrap;justify-content:center;align-items:center;color:var(--muted);font-size:.85rem}
 .setting{display:flex;align-items:center;gap:8px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:2px}
 .seg button{font:500 .82rem var(--font-ui);border:0;background:transparent;color:var(--muted);padding:5px 11px;border-radius:999px;cursor:pointer}
@@ -101,34 +111,85 @@ h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.02em}
 .swatch.custom{position:relative;overflow:hidden;background:conic-gradient(#e03131,#f08c00,#2f9e44,#1971c2,#7048e8,#e03131)}
 .swatch.custom input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:0;padding:0}
 .seg button:focus-visible,.swatch:focus-visible,.swatch.custom:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+.hint{font-size:.78rem;color:var(--muted);text-align:center;margin:0;line-height:2}
 kbd{font-family:var(--font-digit);font-size:.75rem;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
 
-body.fs .presets,body.fs .custom,body.fs .opts,body.fs .settings,body.fs .hint,body.fs header{display:none}
-body.fs .dial{width:min(90vw,66vh)}
-body.fs .race{width:min(90vw,110vh);height:96px}
-body.fs #runner{width:72px;height:78px;left:calc((100% - 82px) * var(--p))}
-body.fs .lane-done{width:calc((100% - 82px) * var(--p) + 36px)}
-body.fs .finish{height:70px}
+/* ---------- Wide / landscape: one screen, no scroll ---------- */
+@media (min-width:860px) and (min-aspect-ratio:5/4){
+  .app{max-width:none;height:100dvh;min-height:0;padding:2.4vh 3vw 2.6vh;gap:1.8vh 3vw;
+    grid-template-columns:minmax(0,1fr) clamp(320px,29vw,440px);
+    grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"head head" "dial panel" "race race";
+    justify-items:stretch;align-items:stretch}
+  h1{font-size:clamp(1.1rem,1.6vw,1.5rem)}
+  .label{font-size:clamp(.75rem,1vw,.95rem)}
+  .stage{container-type:size;height:100%;min-height:0}
+  .dial{width:min(100cqw,100cqh)}
+  .race{width:100%;--rw:clamp(44px,7vh,88px)}
+
+  .panel{align-self:center;align-items:stretch;gap:clamp(12px,2.2vh,22px);max-height:100%;overflow:auto;
+    background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:clamp(16px,3vh,28px)}
+  .section-title{display:block;font-size:.72rem;color:var(--muted);letter-spacing:.12em;margin:0 0 -4px}
+  .presets{display:grid;grid-template-columns:repeat(4,1fr)}
+  .presets .chip,.panel .chip{background:var(--bg)}
+  .presets .chip[aria-pressed="true"]{background:var(--ink)}
+  .custom{justify-content:flex-start;flex-wrap:nowrap}
+  .field{background:var(--bg);flex:1}
+  .field input{flex:1;width:0}
+  .controls{display:grid;grid-template-columns:repeat(3,1fr)}
+  .btn{min-width:0;padding:clamp(10px,1.7vh,16px) 12px}
+  .btn.primary{grid-column:1 / -1;font-size:1.15rem}
+  .btn:not(.primary){background:var(--bg)}
+  .opts,.settings{justify-content:flex-start}
+  .settings{flex-direction:column;align-items:flex-start;gap:12px}
+  .seg{background:var(--bg)}
+  .swatch{border-color:var(--surface)}
+  .hint{text-align:left}
+}
+@media (min-width:860px) and (min-aspect-ratio:5/4) and (max-height:760px){
+  .panel{gap:10px;padding:16px}
+  .section-title,.hint{display:none}
+  .chip{padding:6px 10px}
+  .settings{gap:8px}
+}
+
+/* ---------- Fullscreen projector mode ---------- */
+body.fs header{display:none}
+body.fs .panel > :not(.controls){display:none}
+body.fs .app{max-width:none;height:100dvh;min-height:0;padding:2.5vh 3vw;gap:1.6vh;
+  grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto;
+  grid-template-areas:"dial" "race" "panel";justify-items:stretch}
+body.fs .stage{container-type:size;height:100%;min-height:0}
+body.fs .dial{width:min(100cqw,100cqh)}
+body.fs .race{width:100%;--rw:clamp(48px,8vh,104px)}
+body.fs .panel{background:none;border:0;padding:0;align-self:auto;overflow:visible;opacity:.35;transition:opacity .2s}
+body.fs .panel:hover,body.fs .panel:focus-within{opacity:1}
+body.fs .controls{display:flex;justify-content:center}
+body.fs .btn.primary{grid-column:auto;font-size:1rem}
+
 @media (prefers-reduced-motion:reduce){.prog{transition:none}.dial.done .time{animation:none}.race #runner{animation:none!important}}
 </style>
 </head>
 <body>
 
-<div class="wrap">
+<div class="app">
   <header>
     <h1>課堂倒數計時器</h1>
     <span class="label" id="endAt">—</span>
   </header>
 
-  <div class="dial" id="dial">
-    <svg viewBox="0 0 200 200" aria-hidden="true">
-      <g class="ticks" id="ticks"></g>
-      <circle class="track" cx="100" cy="100" r="84" stroke-width="10"/>
-      <circle class="prog" id="prog" cx="100" cy="100" r="84" stroke-width="10"/>
-    </svg>
-    <div class="readout">
-      <div class="time" id="time" role="timer" aria-live="off">05:00</div>
-      <div class="status" id="status">準備開始</div>
+  <div class="stage">
+    <div class="dial" id="dial">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <g class="ticks" id="ticks"></g>
+        <circle class="track" cx="100" cy="100" r="84" stroke-width="10"/>
+        <circle class="prog" id="prog" cx="100" cy="100" r="84" stroke-width="10"/>
+      </svg>
+      <div class="readout">
+        <div class="time" id="time" role="timer" aria-live="off">05:00</div>
+        <div class="status" id="status">準備開始</div>
+      </div>
     </div>
   </div>
 
@@ -139,56 +200,59 @@ body.fs .finish{height:70px}
     <canvas id="runner" width="12" height="13"></canvas>
   </div>
 
-  <div class="presets" id="presets" role="group" aria-label="快速設定">
-    <button class="chip" data-s="30">30 秒</button>
-    <button class="chip" data-s="60">1 分</button>
-    <button class="chip" data-s="180">3 分</button>
-    <button class="chip" data-s="300" aria-pressed="true">5 分</button>
-    <button class="chip" data-s="600">10 分</button>
-    <button class="chip" data-s="900">15 分</button>
-    <button class="chip" data-s="2700">45 分</button>
-  </div>
+  <aside class="panel">
+    <p class="section-title">快速設定</p>
+    <div class="presets" id="presets" role="group" aria-label="快速設定">
+      <button class="chip" data-s="30">30 秒</button>
+      <button class="chip" data-s="60">1 分</button>
+      <button class="chip" data-s="180">3 分</button>
+      <button class="chip" data-s="300" aria-pressed="true">5 分</button>
+      <button class="chip" data-s="600">10 分</button>
+      <button class="chip" data-s="900">15 分</button>
+      <button class="chip" data-s="2700">45 分</button>
+    </div>
 
-  <form class="custom" id="customForm">
-    <label class="field" for="inMin"><input id="inMin" type="number" min="0" max="599" value="5" inputmode="numeric"><span>分</span></label>
-    <label class="field" for="inSec"><input id="inSec" type="number" min="0" max="59" value="0" inputmode="numeric"><span>秒</span></label>
-    <button class="chip" type="submit">設定</button>
-  </form>
+    <form class="custom" id="customForm">
+      <label class="field" for="inMin"><input id="inMin" type="number" min="0" max="599" value="5" inputmode="numeric"><span>分</span></label>
+      <label class="field" for="inSec"><input id="inSec" type="number" min="0" max="59" value="0" inputmode="numeric"><span>秒</span></label>
+      <button class="chip" type="submit">設定</button>
+    </form>
 
-  <div class="controls">
-    <button class="btn primary" id="startBtn">開始</button>
-    <button class="btn" id="addBtn">+1 分</button>
-    <button class="btn" id="resetBtn">重設</button>
-    <button class="btn" id="fsBtn">全螢幕</button>
-  </div>
+    <div class="controls">
+      <button class="btn primary" id="startBtn">開始</button>
+      <button class="btn" id="addBtn">+1 分</button>
+      <button class="btn" id="resetBtn">重設</button>
+      <button class="btn" id="fsBtn">全螢幕</button>
+    </div>
 
-  <div class="opts">
-    <label for="optSound"><input type="checkbox" id="optSound" checked> 結束提示音</label>
-    <label for="optTick"><input type="checkbox" id="optTick"> 最後 10 秒嗶聲</label>
-  </div>
+    <div class="opts">
+      <label for="optSound"><input type="checkbox" id="optSound" checked> 結束提示音</label>
+      <label for="optTick"><input type="checkbox" id="optTick"> 最後 10 秒嗶聲</label>
+    </div>
 
-  <div class="settings">
-    <div class="setting">
-      <span id="themeLbl">外觀</span>
-      <div class="seg" id="themeSeg" role="group" aria-labelledby="themeLbl">
-        <button type="button" data-theme="auto">自動</button>
-        <button type="button" data-theme="light">淺色</button>
-        <button type="button" data-theme="dark">深色</button>
+    <div class="settings">
+      <div class="setting">
+        <span id="themeLbl">外觀</span>
+        <div class="seg" id="themeSeg" role="group" aria-labelledby="themeLbl">
+          <button type="button" data-theme="auto">自動</button>
+          <button type="button" data-theme="light">淺色</button>
+          <button type="button" data-theme="dark">深色</button>
+        </div>
+      </div>
+      <div class="setting">
+        <span id="accentLbl">主題色</span>
+        <div class="swatches" id="swatches" role="group" aria-labelledby="accentLbl">
+          <button type="button" class="swatch" data-accent="orange" style="--c:#e8590c" aria-label="橘色"></button>
+          <button type="button" class="swatch" data-accent="blue" style="--c:#1c7ed6" aria-label="藍色"></button>
+          <button type="button" class="swatch" data-accent="green" style="--c:#2b8a3e" aria-label="綠色"></button>
+          <button type="button" class="swatch" data-accent="purple" style="--c:#7048e8" aria-label="紫色"></button>
+          <label class="swatch custom" data-accent="custom" title="自訂顏色"><input type="color" id="customColor" value="#0ca678" aria-label="自訂顏色"></label>
+        </div>
       </div>
     </div>
-    <div class="setting">
-      <span id="accentLbl">主題色</span>
-      <div class="swatches" id="swatches" role="group" aria-labelledby="accentLbl">
-        <button type="button" class="swatch" data-accent="orange" style="--c:#e8590c" aria-label="橘色"></button>
-        <button type="button" class="swatch" data-accent="blue" style="--c:#1c7ed6" aria-label="藍色"></button>
-        <button type="button" class="swatch" data-accent="green" style="--c:#2b8a3e" aria-label="綠色"></button>
-        <button type="button" class="swatch" data-accent="purple" style="--c:#7048e8" aria-label="紫色"></button>
-        <label class="swatch custom" data-accent="custom" title="自訂顏色"><input type="color" id="customColor" value="#0ca678" aria-label="自訂顏色"></label>
-      </div>
-    </div>
-  </div>
 
-  <p class="hint"><kbd>空白鍵</kbd> 開始／暫停　<kbd>R</kbd> 重設　<kbd>F</kbd> 全螢幕　<kbd>↑</kbd><kbd>↓</kbd> ±1 分</p>
+    <p class="hint"><kbd>空白鍵</kbd> 開始／暫停　<kbd>R</kbd> 重設　<kbd>F</kbd> 全螢幕　<kbd>↑</kbd><kbd>↓</kbd> ±1 分</p>
+  </aside>
 </div>
 
 <script>
@@ -250,6 +314,7 @@ body.fs .finish{height:70px}
     });
   }
   const runFrame = () => reduceMotion.matches ? 3 : RUN_SEQ[Math.floor(performance.now() / 110) % RUN_SEQ.length];
+
   // ---- Appearance: theme (auto / light / dark) + accent color, remembered per browser ----
   const ACCENTS = {
     orange: { l: '#d9480f', d: '#ff7a3d' },
